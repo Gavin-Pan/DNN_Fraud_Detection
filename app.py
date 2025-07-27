@@ -452,20 +452,19 @@ if __name__ == '__main__':
     try:
         fraud_model.load_model()
         app_stats['model_loaded'] = True
-        logger.info("✅ Fraud detection model loaded successfully!")
+        print("✅ Fraud detection model loaded successfully!")
     except Exception as e:
-        logger.error(f"❌ Error loading model: {e}")
+        print(f"❌ Error loading model: {e}")
         app_stats['model_loaded'] = False
     
-    # Get port from environment variable (for Render)
-    port = int(os.environ.get('PORT', 5000))
-    
-    # Run the application
-    print("🚀 Starting Fraud Detection API Server...")
-    print(f"🌐 Server will run on port: {port}")
-    
-    app.run(
-        host='0.0.0.0',
-        port=port,
-        debug=False  # Production mode
-    )
+    # Detect if running on Replit
+    if os.environ.get('REPL_ID') or os.environ.get('REPL_SLUG'):
+        # Running on Replit
+        print("🚀 Starting Fraud Detection System on Replit...")
+        print("🌐 Your app will be available at the Replit URL")
+        app.run(host='0.0.0.0', port=8080, debug=False)
+    else:
+        # Running locally or other platforms
+        port = int(os.environ.get('PORT', 5000))
+        print(f"🚀 Starting Fraud Detection System on port {port}...")
+        app.run(host='0.0.0.0', port=port, debug=False)
