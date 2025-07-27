@@ -82,6 +82,7 @@ docs/_build/
 *.tmp
 *.temp
 temp_*
+EOF
 
 # Large binary files
 *.dll
@@ -93,3 +94,4 @@ temp_*
 *.backup
 *~
 "@ | Out-File -FilePath .gitignore -Encoding utf8
+

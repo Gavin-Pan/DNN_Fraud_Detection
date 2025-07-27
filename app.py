@@ -449,16 +449,23 @@ if __name__ == '__main__':
     os.makedirs('logs', exist_ok=True)
     
     # Initialize model
-    initialize_model()
+    try:
+        fraud_model.load_model()
+        app_stats['model_loaded'] = True
+        logger.info("✅ Fraud detection model loaded successfully!")
+    except Exception as e:
+        logger.error(f"❌ Error loading model: {e}")
+        app_stats['model_loaded'] = False
+    
+    # Get port from environment variable (for Render)
+    port = int(os.environ.get('PORT', 5000))
     
     # Run the application
     print("🚀 Starting Fraud Detection API Server...")
-    print(f"🌐 Access the application at: http://localhost:5000")
-    print(f"📊 API Health Check: http://localhost:5000/api/health")
-    print(f"🧪 Test Endpoint: http://localhost:5000/api/test-transaction")
+    print(f"🌐 Server will run on port: {port}")
     
     app.run(
         host='0.0.0.0',
-        port=5000,
-        debug=Config.DEBUG
+        port=port,
+        debug=False  # Production mode
     )
