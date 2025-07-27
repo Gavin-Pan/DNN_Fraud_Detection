@@ -444,27 +444,28 @@ def get_test_transaction():
 # MAIN APPLICATION #
 # ================================
 
+# For Vercel deployment
 if __name__ == '__main__':
     # Create necessary directories
     os.makedirs('logs', exist_ok=True)
     
-    # Initialize model
+    # Initialize model (will use fallback if TensorFlow issues)
     try:
         fraud_model.load_model()
         app_stats['model_loaded'] = True
-        print("✅ Fraud detection model loaded successfully!")
+        print("✅ Model loaded successfully!")
     except Exception as e:
-        print(f"❌ Error loading model: {e}")
+        print(f"❌ Using fallback prediction: {e}")
         app_stats['model_loaded'] = False
     
-    # Detect if running on Replit
-    if os.environ.get('REPL_ID') or os.environ.get('REPL_SLUG'):
-        # Running on Replit
-        print("🚀 Starting Fraud Detection System on Replit...")
-        print("🌐 Your app will be available at the Replit URL")
-        app.run(host='0.0.0.0', port=8080, debug=False)
+    # Run differently based on environment
+    if os.environ.get('VERCEL'):
+        # Running on Vercel - don't call app.run()
+        pass
     else:
-        # Running locally or other platforms
+        # Running locally
         port = int(os.environ.get('PORT', 5000))
-        print(f"🚀 Starting Fraud Detection System on port {port}...")
         app.run(host='0.0.0.0', port=port, debug=False)
+
+# Export the app for Vercel
+application = app
