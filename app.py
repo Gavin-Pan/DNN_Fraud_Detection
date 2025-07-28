@@ -444,28 +444,34 @@ def get_test_transaction():
 # MAIN APPLICATION #
 # ================================
 
-# For Vercel deployment
+# Netlify deployment configuration
 if __name__ == '__main__':
     # Create necessary directories
     os.makedirs('logs', exist_ok=True)
     
-    # Initialize model (will use fallback if TensorFlow issues)
+    # Initialize model with your trained TensorFlow model
     try:
+        print("🔄 Loading TensorFlow fraud detection model...")
         fraud_model.load_model()
         app_stats['model_loaded'] = True
-        print("✅ Model loaded successfully!")
+        print("✅ TensorFlow model loaded successfully!")
+        print(f"🧠 Model type: {fraud_model.get_model_info().get('model_type', 'Unknown')}")
     except Exception as e:
-        print(f"❌ Using fallback prediction: {e}")
+        print(f"❌ Error loading TensorFlow model: {e}")
+        print("🔄 Will use fallback prediction method")
         app_stats['model_loaded'] = False
     
-    # Run differently based on environment
-    if os.environ.get('VERCEL'):
-        # Running on Vercel - don't call app.run()
+    # Detect environment and run appropriately
+    if os.environ.get('NETLIFY') or os.environ.get('AWS_LAMBDA_FUNCTION_NAME'):
+        # Running on Netlify/serverless - don't call app.run()
+        print("🌐 Flask app configured for Netlify deployment")
         pass
     else:
         # Running locally
         port = int(os.environ.get('PORT', 5000))
+        print(f"🚀 Starting Flask app locally on port {port}...")
+        print(f"📡 API endpoints available at: http://localhost:{port}/api/")
         app.run(host='0.0.0.0', port=port, debug=False)
 
-# Export the app for Vercel
+# Make sure your app is available for import
 application = app
