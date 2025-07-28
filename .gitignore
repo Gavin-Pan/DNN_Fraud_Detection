@@ -22,6 +22,7 @@ env/
 .env/
 .venv/
 ENV/
+fraud_data
 
 # Python cache files
 __pycache__/
