@@ -444,7 +444,7 @@ def get_test_transaction():
 # MAIN APPLICATION #
 # ================================
 
-# Netlify deployment configuration
+# Netlify deployment configuration #
 if __name__ == '__main__':
     # Create necessary directories
     os.makedirs('logs', exist_ok=True)
