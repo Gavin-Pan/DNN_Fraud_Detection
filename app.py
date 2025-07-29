@@ -45,6 +45,7 @@ app_stats = {
     'model_loaded': False
 }
 
+
 def initialize_model():
     """Load the fraud detection model on app startup"""
     try:
@@ -52,15 +53,9 @@ def initialize_model():
         fraud_model.load_model()
         app_stats['model_loaded'] = True
         logger.info("✅ Fraud detection model loaded successfully!")
-        logger.info(f"🧠 Model type: {fraud_model.get_model_info().get('model_type', 'Unknown')}")
     except Exception as e:
         logger.error(f"❌ Error loading model: {e}")
         app_stats['model_loaded'] = False
-
-# ================================
-# INITIALIZE MODEL ON STARTUP - FIX FOR ISSUE 1
-# ================================
-initialize_model()
 
 # ================================
 # API ROUTES
@@ -69,22 +64,7 @@ initialize_model()
 @app.route('/')
 def index():
     """Serve the main application page"""
-    try:
-        return render_template('index.html')
-    except Exception as e:
-        # Fallback if template not found
-        return jsonify({
-            'message': '🛡️ FraudGuard API is running!',
-            'status': 'healthy',
-            'api_endpoints': {
-                '/api/health': 'Health check',
-                '/api/predict': 'Fraud prediction (POST)',
-                '/api/model-info': 'Model information',
-                '/api/stats': 'Statistics',
-                '/api/test-transaction': 'Sample data'
-            },
-            'error': f'Template not found: {str(e)}'
-        })
+    return render_template('index.html')
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
@@ -97,9 +77,7 @@ def health_check():
         'uptime_seconds': uptime,
         'total_predictions': app_stats['total_predictions'],
         'fraud_detected': app_stats['fraud_detected'],
-        'version': '1.0.0',
-        'platform': os.environ.get('NETLIFY', 'local'),
-        'python_version': sys.version.split()[0]
+        'version': '1.0.0'
     })
 
 @app.route('/api/model-info', methods=['GET'])
@@ -463,24 +441,31 @@ def get_test_transaction():
     })
 
 # ================================
-# MAIN APPLICATION
+# MAIN APPLICATION #
 # ================================
 
+# Netlify deployment configuration #
 if __name__ == '__main__':
     # Create necessary directories
     os.makedirs('logs', exist_ok=True)
     
-    # The model is already initialized above with initialize_model()
-    # Just print status for local development
-    print("🔄 Fraud Detection System Status:")
-    print(f"✅ Model loaded: {app_stats['model_loaded']}")
-    if app_stats['model_loaded']:
+    # Initialize model with your trained TensorFlow model
+    try:
+        print("🔄 Loading TensorFlow fraud detection model...")
+        fraud_model.load_model()
+        app_stats['model_loaded'] = True
+        print("✅ TensorFlow model loaded successfully!")
         print(f"🧠 Model type: {fraud_model.get_model_info().get('model_type', 'Unknown')}")
+    except Exception as e:
+        print(f"❌ Error loading TensorFlow model: {e}")
+        print("🔄 Will use fallback prediction method")
+        app_stats['model_loaded'] = False
     
     # Detect environment and run appropriately
     if os.environ.get('NETLIFY') or os.environ.get('AWS_LAMBDA_FUNCTION_NAME'):
         # Running on Netlify/serverless - don't call app.run()
         print("🌐 Flask app configured for Netlify deployment")
+        pass
     else:
         # Running locally
         port = int(os.environ.get('PORT', 5000))
