@@ -6,12 +6,27 @@
 [build.environment]
   PYTHON_VERSION = "3.9"
 
+# Add this section for function configuration
+[functions]
+  # Set timeout to 30 seconds for ML model operations
+  "app" = { timeout = 30 }
+
 [[redirects]]
+  # Redirect API calls to the serverless function
   from = "/api/*"
   to = "/.netlify/functions/app/:splat"
   status = 200
 
 [[redirects]]
+  # Serve static files and fallback to index.html for SPA
   from = "/*"
   to = "/templates/index.html"
   status = 200
+
+# Headers for CORS
+[[headers]]
+  for = "/api/*"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type, Authorization, X-Requested-With"

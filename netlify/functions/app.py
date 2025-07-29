@@ -7,18 +7,12 @@ project_root = os.path.join(os.path.dirname(__file__), '..', '..')
 sys.path.insert(0, project_root)
 
 # Import your existing Flask app
-from app import app, initialize_model
+from app import app
 
 def handler(event, context):
     """Netlify serverless function handler"""
     
     try:
-        # Initialize model on first request (if not already done)
-        initialize_model()
-        
-        # Import serverless WSGI adapter
-        import serverless_wsgi
-        
         # Handle CORS preflight requests
         if event.get('httpMethod') == 'OPTIONS':
             return {
@@ -31,9 +25,14 @@ def handler(event, context):
                 'body': ''
             }
         
-        # Use serverless-wsgi to handle the Flask app
-        response = serverless_wsgi.handle_request(app, event, context)
-        
+        # Import serverless WSGI adapter
+        try:
+            import serverless_wsgi
+            response = serverless_wsgi.handle_request(app, event, context)
+        except ImportError:
+            # Fallback if serverless-wsgi is not available
+            response = fallback_handler(event, context)
+            
         # Ensure CORS headers
         if 'headers' not in response:
             response['headers'] = {}
@@ -60,41 +59,36 @@ def handler(event, context):
 def fallback_handler(event, context):
     """Fallback handler without serverless-wsgi"""
     try:
-        from werkzeug.test import Client
-        from werkzeug.wrappers import Response
-        
-        # Create a test client for your Flask app
-        client = Client(app, Response)
-        
         # Extract request information from Netlify event
         method = event.get('httpMethod', 'GET')
-        path = event.get('path', '/').replace('/.netlify/functions/app', '')
-        if not path or path == '/':
-            path = '/'
+        path = event.get('path', '/')
+        
+        # Remove the Netlify functions prefix to get the actual path
+        if path.startswith('/.netlify/functions/app'):
+            path = path.replace('/.netlify/functions/app', '') or '/'
         
         headers = event.get('headers', {})
         body = event.get('body', '')
-        query_string = event.get('rawQuery', '')
+        query_string = event.get('queryStringParameters', {})
         
-        # Prepare the path with query string
-        if query_string:
-            path = f"{path}?{query_string}"
-        
-        # Make request to Flask app
-        if method in ['POST', 'PUT', 'PATCH']:
-            response = client.open(
-                path, 
-                method=method, 
-                data=body,
-                headers=[(k, v) for k, v in headers.items()],
-                content_type=headers.get('content-type', 'application/json')
-            )
-        else:
-            response = client.open(
-                path, 
-                method=method,
-                headers=[(k, v) for k, v in headers.items()]
-            )
+        # Create a test client
+        with app.test_client() as client:
+            # Prepare headers for the request
+            request_headers = {}
+            if 'content-type' in headers:
+                request_headers['Content-Type'] = headers['content-type']
+            
+            # Make the request
+            if method == 'GET':
+                response = client.get(path, query_string=query_string, headers=request_headers)
+            elif method == 'POST':
+                response = client.post(path, data=body, headers=request_headers)
+            elif method == 'PUT':
+                response = client.put(path, data=body, headers=request_headers)
+            elif method == 'DELETE':
+                response = client.delete(path, headers=request_headers)
+            else:
+                response = client.open(path, method=method, data=body, headers=request_headers)
         
         # Convert Flask response to Netlify format
         response_headers = {
@@ -104,8 +98,8 @@ def fallback_handler(event, context):
         }
         
         # Add Flask response headers
-        for header, value in response.headers:
-            response_headers[header] = value
+        for key, value in response.headers:
+            response_headers[key] = value
         
         return {
             'statusCode': response.status_code,
@@ -126,5 +120,6 @@ def fallback_handler(event, context):
             })
         }
 
-# Export the handler
-app_handler = handler
+# Export the handler - This is crucial!
+def lambda_handler(event, context):
+    return handler(event, context)
