@@ -1,27 +1,20 @@
-import json
 import sys
 import os
+import json
 
-# Add project root to path
+# Add the project root to Python path
 project_root = os.path.join(os.path.dirname(__file__), '..', '..')
 sys.path.insert(0, project_root)
 
+# Import your existing Flask app
+from app import app
+
 def handler(event, context):
-    """Simple Netlify handler that returns JSON directly"""
+    """Netlify serverless function handler"""
     
     try:
-        # Get the path and method
-        path = event.get('path', '/')
-        method = event.get('httpMethod', 'GET')
-        
-        # Remove Netlify function prefix
-        if path.startswith('/.netlify/functions/app'):
-            path = path.replace('/.netlify/functions/app', '') or '/'
-        
-        print(f"Processing: {method} {path}")
-        
-        # Handle CORS preflight
-        if method == 'OPTIONS':
+        # Handle CORS preflight requests
+        if event.get('httpMethod') == 'OPTIONS':
             return {
                 'statusCode': 200,
                 'headers': {
@@ -32,150 +25,106 @@ def handler(event, context):
                 'body': ''
             }
         
-        # Route handling
-        if path == '/api/health' or path == '/health':
-            return json_response({
-                'status': 'healthy',
-                'message': 'API is working!',
-                'path': path,
-                'method': method
-            })
+        # Import serverless WSGI adapter
+        try:
+            import serverless_wsgi
+            # For serverless-wsgi 3.x, use handle_request
+            response = serverless_wsgi.handle_request(app, event, context)
+        except ImportError:
+            # Fallback if serverless-wsgi is not available
+            response = fallback_handler(event, context)
+        except Exception as wsgi_error:
+            # If serverless-wsgi fails, use fallback
+            print(f"WSGI error: {wsgi_error}")
+            response = fallback_handler(event, context)
             
-        elif path == '/api/test-transaction' or path == '/test-transaction':
-            return json_response({
-                'success': True,
-                'sample_transactions': [
-                    {
-                        'name': 'High Risk Transfer',
-                        'data': {
-                            'type': 'TRANSFER',
-                            'amount': 250000,
-                            'oldbalanceOrg': 500000,
-                            'newbalanceOrig': 250000,
-                            'oldbalanceDest': 100000,
-                            'newbalanceDest': 350000,
-                            'isFlaggedFraud': 0,
-                            'step': 150
-                        }
-                    },
-                    {
-                        'name': 'Low Risk Payment',
-                        'data': {
-                            'type': 'PAYMENT',
-                            'amount': 1000,
-                            'oldbalanceOrg': 50000,
-                            'newbalanceOrig': 49000,
-                            'oldbalanceDest': 0,
-                            'newbalanceDest': 1000,
-                            'isFlaggedFraud': 0,
-                            'step': 100
-                        }
-                    },
-                    {
-                        'name': 'Suspicious Cash Out',
-                        'data': {
-                            'type': 'CASH_OUT',
-                            'amount': 300000,
-                            'oldbalanceOrg': 300000,
-                            'newbalanceOrig': 0,
-                            'oldbalanceDest': 0,
-                            'newbalanceDest': 300000,
-                            'isFlaggedFraud': 0,
-                            'step': 200
-                        }
-                    }
-                ]
-            })
+        # Ensure CORS headers
+        if 'headers' not in response:
+            response['headers'] = {}
             
-        elif path == '/api/predict' or path == '/predict':
-            if method != 'POST':
-                return json_response({'error': 'Method not allowed'}, 405)
-                
-            try:
-                # Get request body
-                body = event.get('body', '{}')
-                if isinstance(body, str):
-                    data = json.loads(body)
-                else:
-                    data = body
-                
-                # Simple prediction logic (replace with your model later)
-                prediction_result = {
-                    'probability': 0.75,
-                    'classification': 'SUSPICIOUS',
-                    'risk_score': 7.5,
-                    'explanation': 'High amount transfer detected'
-                }
-                
-                return json_response({
-                    'success': True,
-                    'transaction_id': 'TXN_000001',
-                    'prediction': prediction_result,
-                    'input_data': data
-                })
-                
-            except json.JSONDecodeError as e:
-                return json_response({'error': f'Invalid JSON: {str(e)}'}, 400)
-            except Exception as e:
-                return json_response({'error': f'Prediction error: {str(e)}'}, 500)
-                
-        elif path == '/api/stats' or path == '/stats':
-            return json_response({
-                'success': True,
-                'statistics': {
-                    'total_predictions': 0,
-                    'fraud_detected': 0,
-                    'high_risk_detected': 0,
-                    'fraud_rate_percent': 0.0,
-                    'predictions_per_hour': 0.0,
-                    'uptime_hours': 0.0,
-                    'model_loaded': False
-                }
-            })
-            
-        elif path == '/api/model-info' or path == '/model-info':
-            return json_response({
-                'success': True,
-                'model_info': {
-                    'model_type': 'Deep Neural Network',
-                    'version': '1.0.0',
-                    'accuracy': 0.987,
-                    'loaded': False
-                }
-            })
-            
-        else:
-            return json_response({
-                'error': 'Endpoint not found',
-                'available_endpoints': [
-                    '/api/health',
-                    '/api/test-transaction', 
-                    '/api/predict',
-                    '/api/stats',
-                    '/api/model-info'
-                ]
-            }, 404)
-            
+        response['headers']['Access-Control-Allow-Origin'] = '*'
+        
+        return response
+        
     except Exception as e:
-        print(f"Handler error: {str(e)}")
-        return json_response({
-            'error': f'Server error: {str(e)}',
-            'type': str(type(e).__name__)
-        }, 500)
+        # Error response
+        return {
+            'statusCode': 500,
+            'headers': {
+                'Access-Control-Allow-Origin': '*',
+                'Content-Type': 'application/json'
+            },
+            'body': json.dumps({
+                'success': False,
+                'error': f'Server error: {str(e)}',
+                'debug': str(type(e).__name__)
+            })
+        }
 
-def json_response(data, status_code=200):
-    """Helper function to create JSON responses with CORS headers"""
-    return {
-        'statusCode': status_code,
-        'headers': {
-            'Content-Type': 'application/json',
+def fallback_handler(event, context):
+    """Fallback handler without serverless-wsgi"""
+    try:
+        # Extract request information from Netlify event
+        method = event.get('httpMethod', 'GET')
+        path = event.get('path', '/')
+        
+        # Remove the Netlify functions prefix to get the actual path
+        if path.startswith('/.netlify/functions/app'):
+            path = path.replace('/.netlify/functions/app', '') or '/'
+        
+        headers = event.get('headers', {})
+        body = event.get('body', '')
+        query_string = event.get('queryStringParameters', {})
+        
+        # Create a test client
+        with app.test_client() as client:
+            # Prepare headers for the request
+            request_headers = {}
+            if 'content-type' in headers:
+                request_headers['Content-Type'] = headers['content-type']
+            
+            # Make the request
+            if method == 'GET':
+                response = client.get(path, query_string=query_string, headers=request_headers)
+            elif method == 'POST':
+                response = client.post(path, data=body, headers=request_headers)
+            elif method == 'PUT':
+                response = client.put(path, data=body, headers=request_headers)
+            elif method == 'DELETE':
+                response = client.delete(path, headers=request_headers)
+            else:
+                response = client.open(path, method=method, data=body, headers=request_headers)
+        
+        # Convert Flask response to Netlify format
+        response_headers = {
             'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        },
-        'body': json.dumps(data)
-    }
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS, PUT, DELETE',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With'
+        }
+        
+        # Add Flask response headers
+        for key, value in response.headers:
+            response_headers[key] = value
+        
+        return {
+            'statusCode': response.status_code,
+            'headers': response_headers,
+            'body': response.get_data(as_text=True)
+        }
+        
+    except Exception as e:
+        return {
+            'statusCode': 500,
+            'headers': {
+                'Access-Control-Allow-Origin': '*',
+                'Content-Type': 'application/json'
+            },
+            'body': json.dumps({
+                'success': False,
+                'error': f'Fallback handler error: {str(e)}'
+            })
+        }
 
-# Export for Netlify
+# Export the handler - This is crucial!
 def lambda_handler(event, context):
     return handler(event, context)
