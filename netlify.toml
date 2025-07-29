@@ -1,13 +1,10 @@
 [build]
   command = "pip install -r requirements.txt"
   functions = "netlify/functions"
-  publish = "."
+  publish = "templates"
 
 [build.environment]
-  PYTHON_VERSION = "3.12"
-
-[functions]
-  node_bundler = "esbuild"
+  PYTHON_VERSION = "3.9"
 
 [[redirects]]
   from = "/api/*"
@@ -16,17 +13,5 @@
 
 [[redirects]]
   from = "/*"
-  to = "/index.html"
+  to = "/templates/index.html"
   status = 200
-
-[build.processing]
-  skip_processing = false
-
-[build.processing.css]
-  bundle = true
-  minify = true
-
-[build.processing.js]
-  bundle = true
-  minify = true
-

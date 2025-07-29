@@ -2,19 +2,20 @@ import sys
 import os
 import json
 
-# Add the project root to Python path so we can import everything
+# Add the project root to Python path
 project_root = os.path.join(os.path.dirname(__file__), '..', '..')
 sys.path.insert(0, project_root)
 
 # Import your existing Flask app
-from app import app
+from app import app, initialize_model
 
 def handler(event, context):
-    """
-    Netlify serverless function handler for your Flask app with TensorFlow model
-    """
+    """Netlify serverless function handler"""
     
     try:
+        # Initialize model on first request (if not already done)
+        initialize_model()
+        
         # Import serverless WSGI adapter
         import serverless_wsgi
         
@@ -24,9 +25,8 @@ def handler(event, context):
                 'statusCode': 200,
                 'headers': {
                     'Access-Control-Allow-Origin': '*',
-                    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS, PUT, DELETE',
-                    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
-                    'Access-Control-Max-Age': '86400'
+                    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                    'Access-Control-Allow-Headers': 'Content-Type',
                 },
                 'body': ''
             }
@@ -34,23 +34,16 @@ def handler(event, context):
         # Use serverless-wsgi to handle the Flask app
         response = serverless_wsgi.handle_request(app, event, context)
         
-        # Ensure CORS headers are always present
+        # Ensure CORS headers
         if 'headers' not in response:
             response['headers'] = {}
             
-        response['headers'].update({
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS, PUT, DELETE',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With'
-        })
+        response['headers']['Access-Control-Allow-Origin'] = '*'
         
         return response
         
-    except ImportError:
-        # Fallback if serverless-wsgi not available
-        return fallback_handler(event, context)
     except Exception as e:
-        # Error handling
+        # Error response
         return {
             'statusCode': 500,
             'headers': {
@@ -60,7 +53,7 @@ def handler(event, context):
             'body': json.dumps({
                 'success': False,
                 'error': f'Server error: {str(e)}',
-                'message': 'Flask app encountered an error'
+                'debug': str(type(e).__name__)
             })
         }
 
