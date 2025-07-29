@@ -28,9 +28,14 @@ def handler(event, context):
         # Import serverless WSGI adapter
         try:
             import serverless_wsgi
+            # For serverless-wsgi 3.x, use handle_request
             response = serverless_wsgi.handle_request(app, event, context)
         except ImportError:
             # Fallback if serverless-wsgi is not available
+            response = fallback_handler(event, context)
+        except Exception as wsgi_error:
+            # If serverless-wsgi fails, use fallback
+            print(f"WSGI error: {wsgi_error}")
             response = fallback_handler(event, context)
             
         # Ensure CORS headers
