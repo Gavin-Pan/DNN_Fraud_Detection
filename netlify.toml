@@ -24,6 +24,6 @@
   status = 200
 
 # Function settings
-[functions]
+[[functions]]
   external_node_modules = []
   node_bundler = "esbuild"
