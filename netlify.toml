@@ -1,5 +1,5 @@
 [build]
-  command = "pip install -r requirements.txt"
+   command = "echo 'No build needed for basic function'"
   functions = "netlify/functions"
   publish = "templates"
 
@@ -23,10 +23,7 @@
   to = "/templates/index.html"
   status = 200
 
-# Headers for CORS
-[[headers]]
-  for = "/api/*"
-  [headers.values]
-    Access-Control-Allow-Origin = "*"
-    Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS"
-    Access-Control-Allow-Headers = "Content-Type, Authorization, X-Requested-With"
+# Function settings
+[functions]
+  external_node_modules = []
+  node_bundler = "esbuild"
